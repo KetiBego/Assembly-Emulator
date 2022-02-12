@@ -7,7 +7,8 @@ void call_function(string name);
 string get_function_name(string line);
 int index_of(string str, char ch);
 int to_int(string str);
-void store(int* registers, char* stack, int& SP, string command);
+void store(int* registers, char* stack, int SP, string command);
+void load(int* registers, char* stack, int SP, string command);
 
 const string filename = "assembly_code.txt";
 
@@ -52,12 +53,14 @@ int main() {
         } else if (index_of(current_command, 'M') == 0) {
             store(registers, stack, SP, current_command);
         } else if (index_of(current_command, 'M') != -1) {
-            //load();
+            load(registers, stack, SP, current_command);
         } else {
             //perform_operation();
         }
         PC += 4;
     }
+
+    // cout << *(int*)(&stack[4]) << endl;
 
     return 0;
 }
@@ -95,7 +98,7 @@ int to_int(string str) {
     return to_int(str.substr(0, str.length() - 1)) * 10 + str[str.length() - 1] - '0';
 }
 
-void store(int* registers, char* stack, int& SP, string command) {
+void store(int* registers, char* stack, int SP, string command) {
     //M[...] = ...
     string location_addr = command.substr(2, index_of(command, ']') - index_of(command, '[') - 1);
     assert(location_addr.length() >= 2);
@@ -104,17 +107,16 @@ void store(int* registers, char* stack, int& SP, string command) {
     if (location_addr[0] == 'R') {
         int storing_register_index = to_int(location_addr.substr(1));
         if (index_of(str_value, 'R') == -1) {
-            registers[storing_register_index] = to_int(str_value);
+            //storing a constant
+            *(int*)(&stack[registers[storing_register_index]]) = to_int(str_value);
         } else {
             int value_register_index = to_int(str_value.substr(1));
-            registers[storing_register_index] = registers[value_register_index];
+            *(int*)(&stack[registers[storing_register_index]]) = registers[value_register_index];
         }
     } else {
         int offset = SP;
         if (location_addr.length() > 2) {
             int num = to_int(location_addr.substr(3));
-            cout << location_addr << endl;
-            cout << num << " num" << endl;
             if (location_addr[2] == '+') {
                 offset += num;
             } else if (location_addr[2] == '-') {
@@ -124,10 +126,15 @@ void store(int* registers, char* stack, int& SP, string command) {
             }
         }
         if (index_of(str_value, 'R') == -1) {
+            //storing a constant
             *(int*)(&stack[offset]) = to_int(str_value);
         } else {
             int value_register_index = to_int(str_value.substr(1));
             *(int*)(&stack[offset]) = registers[value_register_index];
         }
     }
+}
+
+void load(int* registers, char* stack, int SP, string command) {
+    
 }
