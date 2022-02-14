@@ -11,7 +11,12 @@ bool is_number(string num);
 void store(int* registers, char* stack, int SP, string command);
 bool is_load_operation(string command);
 bool is_special_register(string str);
-void load(int* registers, char* stack, int SP, string command);
+void load(int* registers, char* stack, int& SP, int& RV, string command);
+int get_value_of_special_register(string special_register, int* registers, int SP, int RV);
+int get_memory_from_stack(string address, int* registers, char* stack, int SP, int RV);
+void update_register(string special_register, int value, int* registers, int& SP, int& RV);
+bool is_ALU_operation(string command);
+void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command);
 
 const string filename = "assembly_code.txt";
 
@@ -59,7 +64,9 @@ int main() {
         } else if (is_load_operation(current_command)) {
             cout << current_command << endl;
             cout << "load" << endl;
-            //load(registers, stack, SP, current_command);
+            load(registers, stack, SP, RV, current_command);
+        } else if (is_ALU_operation(current_command)) {
+            perform_ALU(registers, stack, SP, RV, current_command);
         } else {
             //perform_operation();
         }
@@ -157,6 +164,9 @@ bool is_load_operation(string command) {
         if (is_special_register(right_side)) return true;
         if (right_side[0] == 'M') {
             assert(right_side.length() >= 4);
+            assert(right_side.length() >= 4);
+            assert(right_side[1] == '[');
+            assert(right_side[right_side.length() - 1] == ']');
             string between_brackets = right_side.substr(2, index_of(right_side, ']') - index_of(right_side, '[') - 1);
             if (is_number(between_brackets)) return true;
             if (is_special_register(between_brackets)) return true;
@@ -164,13 +174,13 @@ bool is_load_operation(string command) {
                 string summand_1 = between_brackets.substr(0, index_of(between_brackets, '+'));
                 string summand_2 = between_brackets.substr(index_of(between_brackets, '+') + 1);
                 if (is_special_register(summand_1) && is_number(summand_2)) return true;
-                if (is_number(summand_2) && is_special_register(summand_1)) return true;
+                if (is_number(summand_1) && is_special_register(summand_2)) return true;
             }
             if (index_of(between_brackets, '-') != -1) {
                 string minuend = between_brackets.substr(0, index_of(between_brackets, '-'));
                 string subrahend = between_brackets.substr(index_of(between_brackets, '-') + 1);
                 if (is_special_register(minuend) && is_number(subrahend)) return true;
-                if (is_number(subrahend) && is_special_register(minuend)) return true;
+                if (is_number(minuend) && is_special_register(subrahend)) return true;
             }
         }
     }
@@ -186,34 +196,184 @@ bool is_special_register(string str) {
     return false; 
 }
 
-void load(int* registers, char* stack, int SP, string command) {
-    //R... = M[...]
-    string destination_register = command.substr(0, index_of(command, '='));
-    int dest_reg_index = to_int(destination_register.substr(1));
-    string info_address = command.substr(index_of(command, '[') + 1, index_of(command, ']') - index_of(command, '[') - 1);
-    if (info_address[0] == 'R') {
-        int info_index = to_int(info_address.substr(1));
-        registers[dest_reg_index] = *(int*)(&stack[registers[info_index]]);
-    } else if (index_of(info_address, 'S') != -1) {
-        assert(info_address.length() >= 2);
-        if (info_address == "SP") {
-            //R... = M[SP]
-            registers[dest_reg_index] = *(int*)(&stack[SP]);
-        } else {
-            //R... = M[SP + ...]
-            int offset = SP;
-            int num = to_int(info_address.substr(3));
-            if (info_address[2] == '+') {
-                offset += num;
-            } else if (info_address[2] == '-') {
-                offset -= num;
-            } else {
-                //invalid address to store memory
-            }
-            registers[dest_reg_index] = *(int*)(&stack[offset]);
-        }
-    } else {
-        //R... = M[constant]
-        registers[dest_reg_index] = *(int*)(&stack[to_int(info_address)]);
+void load(int* registers, char* stack, int& SP, int& RV, string command) {
+    string left_side = command.substr(0, index_of(command, '='));
+    string right_side = command.substr(index_of(command, '=') + 1);
+    int value;
+    if (is_number(right_side)) {
+        value = to_int(right_side);
+    } else if (is_special_register(right_side)) {
+        value = get_value_of_special_register(right_side, registers, SP, RV);
+    } else if (right_side[0] == 'M') {
+        string between_brackets = right_side.substr(2, index_of(right_side, ']') - index_of(right_side, '[') - 1);
+        value = get_memory_from_stack(between_brackets, registers, stack, SP, RV);
     }
+    update_register(left_side, value, registers, SP, RV);
+}
+
+int get_value_of_special_register(string special_register, int* registers, int SP, int RV) {
+    if (special_register == "SP") return SP;
+    if (special_register == "RV") return RV;
+    if (special_register[0] == 'R') {
+        int index = to_int(special_register.substr(1));
+        return registers[index];
+    }
+    // else error
+    return INT_MIN;
+}
+
+int get_memory_from_stack(string address, int* registers, char* stack, int SP, int RV) {
+    if (is_number(address)) {
+        return *(int*)(&stack[to_int(address)]);
+    } else if (is_special_register(address)) {
+        return *(int*)(&stack[get_value_of_special_register(address, registers, SP, RV)]);
+    } else if (index_of(address, '+') != -1) {
+        string summand_1 = address.substr(0, index_of(address, '+'));
+        string summand_2 = address.substr(index_of(address, '+') + 1);
+        if (is_special_register(summand_1) && is_number(summand_2)) {
+            int index = get_value_of_special_register(summand_1, registers, SP, RV) + to_int(summand_2);
+            return *(int*)(&stack[index]);
+        }
+        if (is_number(summand_1) && is_special_register(summand_2)) {
+            int index = to_int(summand_1) + get_value_of_special_register(summand_2, registers, SP, RV);
+            return *(int*)(&stack[index]);
+        }
+    } else if (index_of(address, '-') != -1) {
+            string minuend = address.substr(0, index_of(address, '-'));
+            string subrahend = address.substr(index_of(address, '-') + 1);
+            if (is_special_register(minuend) && is_number(subrahend)) {
+                int index = get_value_of_special_register(minuend, registers, SP, RV) - to_int(subrahend);
+                if (index < 0) {
+                    //error
+                } else {
+                    return *(int*)(&stack[index]);
+                }
+            }
+            if (is_number(minuend) && is_special_register(subrahend)) {
+                int index = to_int(minuend) - get_value_of_special_register(subrahend, registers, SP, RV);
+                if (index < 0) {
+                    //error
+                } else {
+                    return *(int*)(&stack[index]);
+                }
+            }
+    } else {
+        //error
+    }
+    return INT_MIN;
+}
+
+void update_register(string special_register, int value, int* registers, int& SP, int& RV) {
+    if (special_register == "SP") {
+        SP = value;
+    } else if (special_register == "RV") {
+        RV = value;
+    } else {
+        int register_index = to_int(special_register.substr(1));
+        registers[register_index] = value;
+    }
+}
+
+bool is_ALU_operation(string command) {
+    string left_side = command.substr(0, index_of(command, '='));
+    string right_side = command.substr(index_of(command, '=') + 1);
+    if (is_special_register(left_side)) {
+        string first, second;
+        if (index_of(right_side, '+') != -1) {
+            first = right_side.substr(0, index_of(right_side, '+'));
+            second = right_side.substr(index_of(right_side, '+') + 1);
+            assert(index_of(right_side, '-') == -1 && index_of(right_side, '*') == -1 && index_of(right_side, '/') == -1);
+            return true;
+        } else if (index_of(right_side, '-') != -1) {
+            first = right_side.substr(0, index_of(right_side, '-'));
+            second = right_side.substr(index_of(right_side, '-') + 1);
+            assert(index_of(right_side, '+') == -1 && index_of(right_side, '*') == -1 && index_of(right_side, '/') == -1);
+            return true;
+        } else if (index_of(right_side, '*') != -1) {
+            first = right_side.substr(0, index_of(right_side, '*'));
+            second = right_side.substr(index_of(right_side, '*') + 1);
+            assert(index_of(right_side, '-') == -1 && index_of(right_side, '+') == -1 && index_of(right_side, '/') == -1);
+            return true;
+        } else if (index_of(right_side, '/') != -1) {
+            first = right_side.substr(0, index_of(right_side, '/'));
+            second = right_side.substr(index_of(right_side, '/') + 1);
+            assert(index_of(right_side, '-') == -1 && index_of(right_side, '+') == -1 && index_of(right_side, '*') == -1);
+            return true;
+        }
+    }
+    return false;
+}
+
+void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command) {
+    string left_side = command.substr(0, index_of(command, '='));
+    string right_side = command.substr(index_of(command, '=') + 1);
+    int value;
+    string first, second;
+    int first_value, second_value;
+    if (index_of(right_side, '+') != -1) {
+        first = right_side.substr(0, index_of(right_side, '+'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = right_side.substr(index_of(right_side, '+') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value + second_value;
+    } else if (index_of(right_side, '-') != -1) {
+        first = right_side.substr(0, index_of(right_side, '-'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = right_side.substr(index_of(right_side, '-') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value - second_value;
+    } else if (index_of(right_side, '*') != -1) {
+        first = right_side.substr(0, index_of(right_side, '*'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = right_side.substr(index_of(right_side, '*') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value * second_value;
+    } else if (index_of(right_side, '/') != -1) {
+        first = right_side.substr(0, index_of(right_side, '/'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = right_side.substr(index_of(right_side, '/') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value / second_value;
+    }
+    update_register(left_side, value, registers, SP, RV);
 }
