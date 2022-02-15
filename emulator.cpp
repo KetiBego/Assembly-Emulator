@@ -8,7 +8,8 @@ string get_function_name(string line);
 int index_of(string str, char ch);
 int to_int(string str);
 bool is_number(string num);
-void store(int* registers, char* stack, int SP, string command);
+bool is_store_operation (string command);
+void store(int* registers, char* stack, int& SP, int& RV, string command);
 bool is_load_operation(string command);
 bool is_special_register(string str);
 void load(int* registers, char* stack, int& SP, int& RV, string command);
@@ -23,7 +24,7 @@ const string filename = "assembly_code.txt";
 int main() {
     int *registers = new int[100];
     char *stack = new char[400];
-    int SP = 0;
+    int SP = 400;
     int PC = 0;
     int RV = 0;
     vector<string> commands;
@@ -44,8 +45,8 @@ int main() {
 
     string current_command;
     while (true) {
-        current_command = commands[PC / 4];
         if (PC / 4 == commands.size()) break;
+        current_command = commands[PC / 4];
         if (current_command[current_command.length() - 1] == ':') {
             functions[current_command.substr(0, current_command.length() - 2)] = PC;
         }
@@ -59,11 +60,9 @@ int main() {
         if (current_command == "RET") break;
         if (current_command[current_command.length() - 1] == '>') {
             call_function(get_function_name(current_command));
-        } else if (index_of(current_command, 'M') == 0) {
-            store(registers, stack, SP, current_command);
+        } else if (is_store_operation(current_command)) {
+            store(registers, stack, SP, RV, current_command);
         } else if (is_load_operation(current_command)) {
-            cout << current_command << endl;
-            cout << "load" << endl;
             load(registers, stack, SP, RV, current_command);
         } else if (is_ALU_operation(current_command)) {
             perform_ALU(registers, stack, SP, RV, current_command);
@@ -73,7 +72,7 @@ int main() {
         PC += 4;
     }
 
-    // cout << *(int*)(&stack[4]) << endl;
+    cout << *(int*)(&stack[SP]) << endl;
 
     return 0;
 }
@@ -119,40 +118,62 @@ bool is_number(string num) {
     return true;
 }
 
-void store(int* registers, char* stack, int SP, string command) {
-    //M[...] = ...
-    string location_addr = command.substr(2, index_of(command, ']') - index_of(command, '[') - 1);
-    assert(location_addr.length() >= 2);
-    string str_value = command.substr(index_of(command, '=') + 1);
-    assert(str_value.length() != 0);
-    if (location_addr[0] == 'R') {
-        int storing_register_index = to_int(location_addr.substr(1));
-        if (index_of(str_value, 'R') == -1) {
-            //storing a constant
-            *(int*)(&stack[registers[storing_register_index]]) = to_int(str_value);
-        } else {
-            int value_register_index = to_int(str_value.substr(1));
-            *(int*)(&stack[registers[storing_register_index]]) = registers[value_register_index];
-        }
+bool is_store_operation (string command) {
+    if (command[0] != 'M') return false;
+    if (command.length() < 7) return false;
+    if (command[1] != '[') return true;
+    string left_side = command.substr(0, index_of(command, '='));
+    string right_side = command.substr(index_of(command, '=') + 1);
+    if (left_side[left_side.length() - 1] != ']') return false;
+    if (is_number(right_side) || is_special_register(right_side)) return true;
+    return false;
+}
+
+void store(int* registers, char* stack, int& SP, int& RV, string command) {
+    string left_side = command.substr(0, index_of(command, '='));
+    string right_side = command.substr(index_of(command, '=') + 1);
+    string between_brackets = left_side.substr(2, index_of(right_side, ']') - index_of(right_side, '[') - 1);
+    int value;
+    if (is_number(right_side)) {
+        value = to_int(right_side);
     } else {
-        int offset = SP;
-        if (location_addr.length() > 2) {
-            int num = to_int(location_addr.substr(3));
-            if (location_addr[2] == '+') {
-                offset += num;
-            } else if (location_addr[2] == '-') {
-                offset -= num;
-            } else {
-                //invalid address to store memory
+        value = get_value_of_special_register(right_side, registers, SP, RV);
+    }
+    
+    if (is_number(between_brackets)) {
+        *(int*)(&stack[to_int(between_brackets)]) = value;
+    } else if (is_special_register(between_brackets)) {
+        update_register(between_brackets, value, registers, SP, RV);
+    } else if (index_of(between_brackets, '+') != -1) {
+        string summand_1 = between_brackets.substr(0, index_of(between_brackets, '+'));
+        string summand_2 = between_brackets.substr(index_of(between_brackets, '+') + 1);
+        if (is_special_register(summand_1) && is_number(summand_2)) {
+            int index = get_value_of_special_register(summand_1, registers, SP, RV) + to_int(summand_2);
+            *(int*)(&stack[index]) = value;
+        }
+        if (is_number(summand_1) && is_special_register(summand_2)) {
+            int index = to_int(summand_1) + get_value_of_special_register(summand_2, registers, SP, RV);
+            *(int*)(&stack[index]) = value;
+        }
+    } else if (index_of(between_brackets, '-') != -1) {
+        string minuend = between_brackets.substr(0, index_of(between_brackets, '-'));
+            string subrahend = between_brackets.substr(index_of(between_brackets, '-') + 1);
+            if (is_special_register(minuend) && is_number(subrahend)) {
+                int index = get_value_of_special_register(minuend, registers, SP, RV) - to_int(subrahend);
+                if (index < 0) {
+                    //error
+                } else {
+                    *(int*)(&stack[index]) = value;
+                }
             }
-        }
-        if (index_of(str_value, 'R') == -1) {
-            //storing a constant
-            *(int*)(&stack[offset]) = to_int(str_value);
-        } else {
-            int value_register_index = to_int(str_value.substr(1));
-            *(int*)(&stack[offset]) = registers[value_register_index];
-        }
+            if (is_number(minuend) && is_special_register(subrahend)) {
+                int index = to_int(minuend) - get_value_of_special_register(subrahend, registers, SP, RV);
+                if (index < 0) {
+                    //error
+                } else {
+                    *(int*)(&stack[index]) = value;
+                }
+            }
     }
 }
 
