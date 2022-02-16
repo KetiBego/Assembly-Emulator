@@ -19,6 +19,9 @@ void update_register(string special_register, int value, int* registers, int& SP
 void update_stack(int value, char* stack, int index, string type);
 bool is_ALU_operation(string command);
 void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command);
+bool is_branch_operation(string command);
+bool statement_is_true(int* registers, char* stack, int SP, int RV, string command);
+void change_address(string addr, int& PC);
 
 const string filename = "assembly_code.txt";
 
@@ -60,21 +63,27 @@ int main() {
         current_command = remove_spaces(commands[PC / 4 + 1]);
         if (current_command == "RET") break;
         if (current_command[current_command.length() - 1] == '>') {
-            call_function(get_function_name(current_command));
+            //call_function(get_function_name(current_command));
         } else if (is_store_operation(current_command)) {
             store(registers, stack, SP, RV, current_command);
         } else if (is_load_operation(current_command)) {
             load(registers, stack, SP, RV, current_command);
         } else if (is_ALU_operation(current_command)) {
             perform_ALU(registers, stack, SP, RV, current_command);
+        } else if (is_branch_operation(current_command)) {
+            if (statement_is_true(registers, stack, SP, RV, current_command)) {
+                string after_first_comma = current_command.substr(index_of(current_command, ',') + 1);
+                string after_second_comma = after_first_comma.substr(index_of(after_first_comma, ',') + 1);
+                change_address(after_second_comma, PC);
+                PC -= 4;
+            }
         } else {
             //perform_operation();
         }
         PC += 4;
     }
 
-    // cout << SP << endl;
-    // cout << *(int*)(&stack[SP]) << endl;
+    // cout << *(char*)(&stack[SP]) << endl;
 
     return 0;
 }
@@ -448,4 +457,54 @@ void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command) 
         value = first_value / second_value;
     }
     update_register(left_side, value, registers, SP, RV, type);
+}
+
+bool is_branch_operation(string command) {
+    if (command.length() < 8) return false;
+    string branch_variant = command.substr(0, 3);
+    if (branch_variant != "BLT" && branch_variant != "BLE" && branch_variant != "BGT" && branch_variant != "BGE" && branch_variant != "BEQ" && branch_variant != "BNE") return false;
+    if (index_of(command, ',') == -1) return false;
+    if (index_of(command.substr(index_of(command, ',') + 1), ',') == -1) return false;
+
+    return true;
+}
+
+bool statement_is_true(int* registers, char* stack, int SP, int RV, string command) {
+    string branch_case = command.substr(1, 2);
+    string first_value_str = command.substr(3, index_of(command, ',') - 3);
+    string after_first_comma = command.substr(index_of(command, ',') + 1);
+    string second_value_str = after_first_comma.substr(0, index_of(after_first_comma, ','));
+
+    int first_value, second_value;
+
+    if (is_number(first_value_str)) {
+        first_value = to_int(first_value_str);
+    } else if (is_special_register(first_value_str)) {
+        first_value = get_value_of_special_register(first_value_str, registers, SP, RV);
+    }
+
+    if (is_number(second_value_str)) {
+        second_value = to_int(second_value_str);
+    } else if (is_special_register(second_value_str)) {
+        second_value = get_value_of_special_register(second_value_str, registers, SP, RV);
+    }
+
+    if (branch_case == "LT") return (first_value < second_value);
+    if (branch_case == "LE") return (first_value <= second_value);
+    if (branch_case == "GT") return (first_value > second_value);
+    if (branch_case == "GE") return (first_value >= second_value);
+    if (branch_case == "EQ") return (first_value == second_value);
+    if (branch_case == "NE") return (first_value != second_value);
+
+    return false;
+}
+
+void change_address(string addr, int& PC) {
+    if (is_number(addr)) {
+        PC = to_int(addr);
+    } else if (index_of(addr, '+') != -1) {
+        PC += to_int(addr.substr(index_of(addr, '+' + 1)));
+    } else if (index_of(addr, '-') != -1) {
+        PC -= to_int(addr.substr(index_of(addr, '+' + 1)));
+    }
 }
