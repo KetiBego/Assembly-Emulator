@@ -73,7 +73,8 @@ int main() {
         PC += 4;
     }
 
-    cout << *(int*)(&stack[SP]) << endl;
+    // cout << SP << endl;
+    // cout << *(int*)(&stack[SP]) << endl;
 
     return 0;
 }
@@ -137,12 +138,12 @@ bool is_store_operation (string command) {
 void store(int* registers, char* stack, int& SP, int& RV, string command) {
     string left_side = command.substr(0, index_of(command, '='));
     string right_side = command.substr(index_of(command, '=') + 1);
-    string between_brackets = left_side.substr(2, index_of(right_side, ']') - index_of(right_side, '[') - 1);
+    string between_brackets = left_side.substr(2, index_of(left_side, ']') - index_of(left_side, '[') - 1);
     int value;
     string type = "int";
     if (right_side[0] == '.') {
-        if(right_side[0] == '1') type = "char";
-        if(right_side[0] == '2') type = "short";
+        if(right_side[1] == '1') type = "char";
+        if(right_side[1] == '2') type = "short";
         right_side = right_side.substr(2);
     }
 
@@ -155,7 +156,7 @@ void store(int* registers, char* stack, int& SP, int& RV, string command) {
     if (is_number(between_brackets)) {
         update_stack(value, stack, to_int(between_brackets), type);
     } else if (is_special_register(between_brackets)) {
-        update_register(between_brackets, value, registers, SP, RV, type);
+        update_stack( value, stack, get_value_of_special_register(between_brackets, registers, SP, RV), type);
     } else if (index_of(between_brackets, '+') != -1) {
         string summand_1 = between_brackets.substr(0, index_of(between_brackets, '+'));
         string summand_2 = between_brackets.substr(index_of(between_brackets, '+') + 1);
@@ -239,8 +240,8 @@ void load(int* registers, char* stack, int& SP, int& RV, string command) {
     int value;
     string type = "int";
     if (right_side[0] == '.') {
-        if(right_side[0] == '1') type = "char";
-        if(right_side[0] == '2') type = "short";
+        if(right_side[1] == '1') type = "char";
+        if(right_side[1] == '2') type = "short";
         right_side = right_side.substr(2);
     }
 
@@ -374,8 +375,8 @@ void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command) 
     int value;
     string type = "int";
     if (right_side[0] == '.') {
-        if(right_side[0] == '1') type = "char";
-        if(right_side[0] == '2') type = "short";
+        if(right_side[1] == '1') type = "char";
+        if(right_side[1] == '2') type = "short";
         right_side = right_side.substr(2);
     }
     
