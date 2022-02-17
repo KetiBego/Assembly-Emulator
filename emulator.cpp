@@ -83,7 +83,7 @@ int main() {
         PC += 4;
     }
 
-    // cout << *(char*)(&stack[SP]) << endl;
+    cout << *(int*)(&stack[SP]) << endl;
 
     return 0;
 }
@@ -503,8 +503,8 @@ void change_address(string addr, int& PC) {
     if (is_number(addr)) {
         PC = to_int(addr);
     } else if (index_of(addr, '+') != -1) {
-        PC += to_int(addr.substr(index_of(addr, '+' + 1)));
+        PC += to_int(addr.substr(index_of(addr, '+') + 1));
     } else if (index_of(addr, '-') != -1) {
-        PC -= to_int(addr.substr(index_of(addr, '+' + 1)));
+        PC -= to_int(addr.substr(index_of(addr, '-') + 1));
     }
 }
