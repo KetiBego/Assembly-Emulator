@@ -22,6 +22,7 @@ void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command);
 bool is_branch_operation(string command);
 bool statement_is_true(int* registers, char* stack, int SP, int RV, string command);
 void change_address(string addr, int& PC);
+bool is_jump_operation(string command);
 
 const string filename = "assembly_code.txt";
 
@@ -77,13 +78,16 @@ int main() {
                 change_address(after_second_comma, PC);
                 PC -= 4;
             }
+        } else if (is_jump_operation(current_command)) {
+            change_address(current_command.substr(3), PC);
+            PC -= 4;
         } else {
             //perform_operation();
         }
         PC += 4;
     }
 
-    cout << *(int*)(&stack[SP]) << endl;
+    // cout << *(char*)(&stack[SP + 8]) << endl;
 
     return 0;
 }
@@ -118,10 +122,13 @@ int index_of(string str, char ch) {
 
 int to_int(string str) {
     if (str.length() == 0) return 0;
+    if (str[0] == '-') return ((-1) * to_int(str.substr(1)));
     return to_int(str.substr(0, str.length() - 1)) * 10 + str[str.length() - 1] - '0';
 }
 
 bool is_number(string num) {
+    if (num.length() == 0) return false;
+    if (num[0] == '-') num = num.substr(1);
     for (int i = 0; i < num.length(); i++) {
         if (num[i] < '0' || num[i] > '9') return false;
     }
@@ -507,4 +514,11 @@ void change_address(string addr, int& PC) {
     } else if (index_of(addr, '-') != -1) {
         PC -= to_int(addr.substr(index_of(addr, '-') + 1));
     }
+}
+
+bool is_jump_operation(string command) {
+    if (command.length() < 4) return false;
+    if (command.substr(0, 3) == "JMP") return true;
+
+    return false;
 }
