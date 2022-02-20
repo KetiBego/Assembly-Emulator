@@ -3,7 +3,8 @@
 using namespace std;
 
 string remove_spaces(string str);
-void call_function(string name);
+bool is_call_operation(string command);
+void call_function(int* registers, char* stack, map<string, int> functions, int& PC, int& SP, int& RV, string command);
 string get_function_name(string line);
 int index_of(string str, char ch);
 int to_int(string str);
@@ -25,11 +26,12 @@ void change_address(string addr, int& PC);
 bool is_jump_operation(string command);
 
 const string filename = "assembly_code.txt";
+const int stack_size = 400;
 
 int main() {
     int *registers = new int[100];
-    char *stack = new char[400];
-    int SP = 400;
+    char *stack = new char[stack_size];
+    int SP = stack_size;
     int PC = 0;
     int RV = 0;
     vector<string> commands;
@@ -53,7 +55,7 @@ int main() {
         if (PC / 4 == commands.size()) break;
         current_command = commands[PC / 4];
         if (current_command[current_command.length() - 1] == ':') {
-            functions[current_command.substr(0, current_command.length() - 2)] = PC;
+            functions[current_command.substr(0, current_command.length() - 1)] = PC;
         }
         PC += 4;
     }
@@ -62,9 +64,12 @@ int main() {
     
     while (true) {
         current_command = remove_spaces(commands[PC / 4 + 1]);
-        if (current_command == "RET") break;
-        if (current_command[current_command.length() - 1] == '>') {
-            //call_function(get_function_name(current_command));
+        if (current_command == "RET") {
+            if (SP == stack_size) break;
+            PC = get_memory_from_stack(to_string(SP), registers, stack, SP, RV);
+            SP = SP + 4;
+        } else if (is_call_operation(current_command)) {
+            call_function(registers, stack, functions, PC, SP, RV, current_command);
         } else if (is_store_operation(current_command)) {
             store(registers, stack, SP, RV, current_command);
         } else if (is_load_operation(current_command)) {
@@ -87,7 +92,7 @@ int main() {
         PC += 4;
     }
 
-    // cout << *(char*)(&stack[SP + 8]) << endl;
+    cout << RV << endl;
 
     return 0;
 }
@@ -103,12 +108,32 @@ string remove_spaces(string str) {
     return str;
 }
 
-void call_function(string name) {
+bool is_call_operation(string command) {
+    //cout << command << endl;
+    if (command.length() < 6) return false;
+    if (command.substr(0, 4) == "CALL") return true;
+    return false;
+}
 
+void call_function(int* registers, char* stack, map<string, int> functions, int& PC, int& SP, int& RV, string command) {
+    SP = SP - 4;
+    update_stack(PC, stack, SP, "int");
+
+    string fn = command.substr(4);
+    int fn_addr;
+    if (is_number(fn)) {
+        PC = to_int(fn);
+    } else if (fn[0] == '<') {
+        PC = functions[get_function_name(fn)];
+    } else if (is_special_register(fn)) {
+        PC = get_value_of_special_register(fn, registers, SP, RV);
+    }
+    PC -= 4;
 }
 
 string get_function_name(string line) {
-    string fn_name = line.substr(5, line.length() - 6);
+    string fn_name = line.substr(index_of(line, '<') + 1);
+    fn_name = fn_name.substr(0, fn_name.length() - 1);
     return fn_name;
 }
 
@@ -300,24 +325,24 @@ int get_memory_from_stack(string address, int* registers, char* stack, int SP, i
             return *(int*)(&stack[index]);
         }
     } else if (index_of(address, '-') != -1) {
-            string minuend = address.substr(0, index_of(address, '-'));
-            string subrahend = address.substr(index_of(address, '-') + 1);
-            if (is_special_register(minuend) && is_number(subrahend)) {
-                int index = get_value_of_special_register(minuend, registers, SP, RV) - to_int(subrahend);
-                if (index < 0) {
-                    //error
-                } else {
-                    return *(int*)(&stack[index]);
-                }
+        string minuend = address.substr(0, index_of(address, '-'));
+        string subrahend = address.substr(index_of(address, '-') + 1);
+        if (is_special_register(minuend) && is_number(subrahend)) {
+            int index = get_value_of_special_register(minuend, registers, SP, RV) - to_int(subrahend);
+            if (index < 0) {
+                //error
+            } else {
+                return *(int*)(&stack[index]);
             }
-            if (is_number(minuend) && is_special_register(subrahend)) {
-                int index = to_int(minuend) - get_value_of_special_register(subrahend, registers, SP, RV);
-                if (index < 0) {
-                    //error
-                } else {
-                    return *(int*)(&stack[index]);
-                }
+        }
+        if (is_number(minuend) && is_special_register(subrahend)) {
+            int index = to_int(minuend) - get_value_of_special_register(subrahend, registers, SP, RV);
+            if (index < 0) {
+                //error
+            } else {
+                return *(int*)(&stack[index]);
             }
+        }
     } else {
         //error
     }
