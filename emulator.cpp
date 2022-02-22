@@ -238,7 +238,7 @@ bool is_load_operation(string command) {
         if (is_number(right_side)) return true;
         if (is_special_register(right_side)) return true;
         if (right_side[0] == '.') {
-            if (right_side[1] == '1' || right_side[1] == '2') return is_store_operation(left_side + '=' + right_side.substr(2));
+            if (right_side[1] == '1' || right_side[1] == '2') return is_load_operation(left_side + '=' + right_side.substr(2));
             return false;
         }
         if (right_side[0] == 'M') {
