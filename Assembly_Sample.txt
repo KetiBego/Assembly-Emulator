@@ -1,0 +1,61 @@
+main:
+SP = SP - 20
+M[SP + 16] = 15
+M[SP + 12] = 7
+M[SP + 8] = 4
+M[SP + 4] = 3
+M[SP] = 9
+SP = SP - 8
+R1 = M[SP + 24]
+M[SP] = R1
+R2 = M[SP + 20]
+M[SP + 4] = R2
+CALL <sum>
+SP = SP + 8
+R1 = RV
+SP = SP - 8
+M[SP] = R1
+R2 = M[SP + 16]
+M[SP + 4] = R2
+CALL <subtract>
+SP = SP + 8
+R1 = RV
+SP = SP - 8
+M[SP] = R1
+R2 = M[SP + 12]
+M[SP + 4] = R2
+CALL <multiply>
+SP = SP + 8
+R1 = RV
+SP = SP - 8
+M[SP] = R1
+R2 = M[SP + 8]
+M[SP + 4] = R2
+CALL <divide>
+SP = SP + 8
+SP = SP + 20
+RET
+sum:
+R1 = M[SP + 4]
+R2 = M[SP + 8]
+R3 = R1 + R2
+RV = R3
+RET
+subtract:
+R1 = M[SP + 4]
+R2 = M[SP + 8]
+R3 = R1 - R2
+RV = R3
+RET
+multiply:
+R1 = M[SP + 4]
+R2 = M[SP + 8]
+R3 = R1 * R2
+RV = R3
+RET
+divide:
+R1 = M[SP + 4]
+R2 = M[SP + 8]
+R3 = R1 / R2
+RV = R3
+RET
