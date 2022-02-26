@@ -1,0 +1,20 @@
+//char ch = 'a';
+//for (int i = 0; i < 10; i++) {
+//    ch++;
+//}
+//ch should be 'k' in the end
+main:
+SP = SP - 5
+M[SP + 4] = .1 97
+M[SP] = 0
+R1 = M[SP]
+BGE R1, 10, PC + 32
+R1 = .1 M[SP + 4]
+R2 = R1 + 1
+M[SP + 4] = .1 R2
+R1 = M[SP]
+R2 = R1 + 1
+M[SP] = R2
+JMP PC - 32
+SP = SP + 5
+RET
