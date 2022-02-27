@@ -1,3 +1,12 @@
+//int main {
+//    int a = 15;
+//    int b = 7;
+//    int c = 4;
+//    int d = 3;
+//    int e = 9;
+//    return divide(multiply(subtract(sum(a, b), c), d), e);
+//}
+// This code tests basic operations. The result in the end should be 6.
 main:
 SP = SP - 20
 M[SP + 16] = 15

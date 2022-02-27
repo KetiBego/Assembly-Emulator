@@ -2,7 +2,7 @@
 //for (int i = 0; i < 10; i++) {
 //    ch++;
 //}
-//ch should be 'k' in the end
+//ch should be 'k' in the end (emulator.cpp prints 107, which is equivalent to character k in ascii table)
 main:
 SP = SP - 5
 M[SP + 4] = .1 97
@@ -16,5 +16,6 @@ R1 = M[SP]
 R2 = R1 + 1
 M[SP] = R2
 JMP PC - 32
+RV = .1 M[SP + 4]
 SP = SP + 5
 RET

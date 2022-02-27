@@ -1,3 +1,13 @@
+//int main {
+//    int a = 10;
+//    return fibonacci(a);
+//}
+//int fibonacci(int i) {
+//    int a = fibonacci(i - 1);
+//    int b = fibonacci(i - 2);
+//    return a + b;
+//}
+// This code counts 10th number in the fibonacci sequence.
 main:
 SP = SP - 4
 M[SP] = 10
