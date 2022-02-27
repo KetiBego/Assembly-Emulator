@@ -24,18 +24,21 @@ bool is_branch_operation(string command);
 bool statement_is_true(int* registers, char* stack, int SP, int RV, string command);
 void change_address(string addr, int& PC);
 bool is_jump_operation(string command);
+int count_operation(string operation, int* registers, char* stack, int SP, int RV);
 
-const string filename = "assembly_code.txt";
-const int stack_size = 400;
+const int stack_size = 10000;
 
 int main() {
-    int *registers = new int[100];
+    int *registers = new int[100000];
     char *stack = new char[stack_size];
     int SP = stack_size;
     int PC = 0;
     int RV = 0;
     vector<string> commands;
     map<string, int> functions;
+    string filename;
+    cout << "Enter the filename: ";
+    cin >> filename;
     string line;
     ifstream my_file(filename);
     if (my_file.is_open()) {
@@ -43,7 +46,6 @@ int main() {
         {
             if (line.length() >= 2 && line[0] == '/' && line[1] == '/') continue;
             commands.push_back(line);
-            //cout << line << '\n';
         }
         my_file.close();
     } else {
@@ -87,13 +89,13 @@ int main() {
             change_address(current_command.substr(3), PC);
             PC -= 4;
         } else {
-            //perform_operation();
+            cout << "Could not recognize command " << commands[PC / 4 + 1] << ", exiting the program." << endl;
+            break;
         }
         PC += 4;
     }
 
     cout << RV << endl;
-
     return 0;
 }
 
@@ -109,9 +111,12 @@ string remove_spaces(string str) {
 }
 
 bool is_call_operation(string command) {
-    //cout << command << endl;
     if (command.length() < 6) return false;
-    if (command.substr(0, 4) == "CALL") return true;
+    if (command.substr(0, 4) == "CALL") {
+        string fn = command.substr(4);
+        if (is_special_register(fn) || is_number(fn)) return true;
+        if (fn[0] == '<' && fn[fn.length() - 1] == '>') return true;
+    }
     return false;
 }
 
@@ -164,7 +169,7 @@ bool is_number(string num) {
 bool is_store_operation (string command) {
     if (command[0] != 'M') return false;
     if (command.length() < 7) return false;
-    if (command[1] != '[') return true;
+    if (command[1] != '[') return false;
     string left_side = command.substr(0, index_of(command, '='));
     string right_side = command.substr(index_of(command, '=') + 1);
     if (right_side[0] == '.') {
@@ -172,7 +177,26 @@ bool is_store_operation (string command) {
         return false;
     }
     if (left_side[left_side.length() - 1] != ']') return false;
-    if (is_number(right_side) || is_special_register(right_side)) return true;
+    if (!(is_number(right_side) || is_special_register(right_side))) return false;
+    string between_brackets = left_side.substr(2, index_of(left_side, ']') - index_of(left_side, '[') - 1);
+    if (is_number(between_brackets) || is_special_register(between_brackets)) return true;
+    string first, second;
+    if (index_of(between_brackets, '+') != -1) {
+        first = between_brackets.substr(0, index_of(between_brackets, '+'));
+        second = between_brackets.substr(index_of(between_brackets, '+') + 1);
+    } else if (index_of(between_brackets, '-') != -1) {
+        first = between_brackets.substr(0, index_of(between_brackets, '-'));
+        second = between_brackets.substr(index_of(between_brackets, '-') + 1);
+    } else if (index_of(between_brackets, '*') != -1) {
+        first = between_brackets.substr(0, index_of(between_brackets, '*'));
+        second = between_brackets.substr(index_of(between_brackets, '*') + 1);
+    }  else if (index_of(between_brackets, '/') != -1) {
+        first = between_brackets.substr(0, index_of(between_brackets, '/'));
+        second = between_brackets.substr(index_of(between_brackets, '/') + 1);
+    }
+
+    if (is_special_register(first) && is_special_register(second)) return false;
+    if ((is_number(first) || is_special_register(first)) && (is_number(second) || is_special_register(second))) return true;
     return false;
 }
 
@@ -198,36 +222,9 @@ void store(int* registers, char* stack, int& SP, int& RV, string command) {
         update_stack(value, stack, to_int(between_brackets), type);
     } else if (is_special_register(between_brackets)) {
         update_stack( value, stack, get_value_of_special_register(between_brackets, registers, SP, RV), type);
-    } else if (index_of(between_brackets, '+') != -1) {
-        string summand_1 = between_brackets.substr(0, index_of(between_brackets, '+'));
-        string summand_2 = between_brackets.substr(index_of(between_brackets, '+') + 1);
-        if (is_special_register(summand_1) && is_number(summand_2)) {
-            int index = get_value_of_special_register(summand_1, registers, SP, RV) + to_int(summand_2);
-            update_stack(value, stack, index, type);
-        }
-        if (is_number(summand_1) && is_special_register(summand_2)) {
-            int index = to_int(summand_1) + get_value_of_special_register(summand_2, registers, SP, RV);
-            update_stack(value, stack, index, type);
-        }
-    } else if (index_of(between_brackets, '-') != -1) {
-        string minuend = between_brackets.substr(0, index_of(between_brackets, '-'));
-            string subrahend = between_brackets.substr(index_of(between_brackets, '-') + 1);
-            if (is_special_register(minuend) && is_number(subrahend)) {
-                int index = get_value_of_special_register(minuend, registers, SP, RV) - to_int(subrahend);
-                if (index < 0) {
-                    //error
-                } else {
-                    update_stack(value, stack, index, type);
-                }
-            }
-            if (is_number(minuend) && is_special_register(subrahend)) {
-                int index = to_int(minuend) - get_value_of_special_register(subrahend, registers, SP, RV);
-                if (index < 0) {
-                    //error
-                } else {
-                    update_stack(value, stack, index, type);
-                }
-            }
+    } else {
+        int index = count_operation(between_brackets, registers, stack, SP, RV);
+        update_stack(value, stack, index, type);
     }
 }
 
@@ -242,25 +239,29 @@ bool is_load_operation(string command) {
             return false;
         }
         if (right_side[0] == 'M') {
-            assert(right_side.length() >= 4);
-            assert(right_side.length() >= 4);
-            assert(right_side[1] == '[');
-            assert(right_side[right_side.length() - 1] == ']');
+            if (right_side.length() < 4) return false;
+            if (right_side[1] != '[') return false;
+            if (right_side[right_side.length() - 1] != ']') return false;
             string between_brackets = right_side.substr(2, index_of(right_side, ']') - index_of(right_side, '[') - 1);
             if (is_number(between_brackets)) return true;
             if (is_special_register(between_brackets)) return true;
+            string first, second;
             if (index_of(between_brackets, '+') != -1) {
-                string summand_1 = between_brackets.substr(0, index_of(between_brackets, '+'));
-                string summand_2 = between_brackets.substr(index_of(between_brackets, '+') + 1);
-                if (is_special_register(summand_1) && is_number(summand_2)) return true;
-                if (is_number(summand_1) && is_special_register(summand_2)) return true;
+                first = between_brackets.substr(0, index_of(between_brackets, '+'));
+                second = between_brackets.substr(index_of(between_brackets, '+') + 1);
+            } else if (index_of(between_brackets, '-') != -1) {
+                first = between_brackets.substr(0, index_of(between_brackets, '-'));
+                second = between_brackets.substr(index_of(between_brackets, '-') + 1);
+            } else if (index_of(between_brackets, '*') != -1) {
+                first = between_brackets.substr(0, index_of(between_brackets, '*'));
+                second = between_brackets.substr(index_of(between_brackets, '*') + 1);
+            }  else if (index_of(between_brackets, '/') != -1) {
+                first = between_brackets.substr(0, index_of(between_brackets, '/'));
+                second = between_brackets.substr(index_of(between_brackets, '/') + 1);
             }
-            if (index_of(between_brackets, '-') != -1) {
-                string minuend = between_brackets.substr(0, index_of(between_brackets, '-'));
-                string subrahend = between_brackets.substr(index_of(between_brackets, '-') + 1);
-                if (is_special_register(minuend) && is_number(subrahend)) return true;
-                if (is_number(minuend) && is_special_register(subrahend)) return true;
-            }
+
+            if (is_special_register(first) && is_special_register(second)) return false;
+            if ((is_number(first) || is_special_register(first)) && (is_number(second) || is_special_register(second))) return true;
         }
     }
 
@@ -271,7 +272,7 @@ bool is_special_register(string str) {
     if (str == "SP") return true;
     if (str == "RV") return true;
     if (str.length() < 2) return false;
-    if (str[0] == 'R' && is_number(str.substr(1))) return true;
+    if (str[0] == 'R' && is_number(str.substr(1)) && to_int(str.substr(1)) > 0) return true;
     return false; 
 }
 
@@ -313,39 +314,11 @@ int get_memory_from_stack(string address, int* registers, char* stack, int SP, i
         return *(int*)(&stack[to_int(address)]);
     } else if (is_special_register(address)) {
         return *(int*)(&stack[get_value_of_special_register(address, registers, SP, RV)]);
-    } else if (index_of(address, '+') != -1) {
-        string summand_1 = address.substr(0, index_of(address, '+'));
-        string summand_2 = address.substr(index_of(address, '+') + 1);
-        if (is_special_register(summand_1) && is_number(summand_2)) {
-            int index = get_value_of_special_register(summand_1, registers, SP, RV) + to_int(summand_2);
-            return *(int*)(&stack[index]);
-        }
-        if (is_number(summand_1) && is_special_register(summand_2)) {
-            int index = to_int(summand_1) + get_value_of_special_register(summand_2, registers, SP, RV);
-            return *(int*)(&stack[index]);
-        }
-    } else if (index_of(address, '-') != -1) {
-        string minuend = address.substr(0, index_of(address, '-'));
-        string subrahend = address.substr(index_of(address, '-') + 1);
-        if (is_special_register(minuend) && is_number(subrahend)) {
-            int index = get_value_of_special_register(minuend, registers, SP, RV) - to_int(subrahend);
-            if (index < 0) {
-                //error
-            } else {
-                return *(int*)(&stack[index]);
-            }
-        }
-        if (is_number(minuend) && is_special_register(subrahend)) {
-            int index = to_int(minuend) - get_value_of_special_register(subrahend, registers, SP, RV);
-            if (index < 0) {
-                //error
-            } else {
-                return *(int*)(&stack[index]);
-            }
-        }
     } else {
-        //error
+        int index = count_operation(address, registers, stack, SP, RV);
+        return *(int*)(&stack[index]);
     }
+    
     return INT_MIN;
 }
 
@@ -388,24 +361,21 @@ bool is_ALU_operation(string command) {
         if (index_of(right_side, '+') != -1) {
             first = right_side.substr(0, index_of(right_side, '+'));
             second = right_side.substr(index_of(right_side, '+') + 1);
-            assert(index_of(right_side, '-') == -1 && index_of(right_side, '*') == -1 && index_of(right_side, '/') == -1);
-            return true;
+            if (index_of(right_side, '-') != -1 || index_of(right_side, '*') != -1 || index_of(right_side, '/') != -1) return false;
         } else if (index_of(right_side, '-') != -1) {
             first = right_side.substr(0, index_of(right_side, '-'));
             second = right_side.substr(index_of(right_side, '-') + 1);
-            assert(index_of(right_side, '+') == -1 && index_of(right_side, '*') == -1 && index_of(right_side, '/') == -1);
-            return true;
+            if (index_of(right_side, '+') != -1 || index_of(right_side, '*') != -1 || index_of(right_side, '/') != -1) return false;
         } else if (index_of(right_side, '*') != -1) {
             first = right_side.substr(0, index_of(right_side, '*'));
             second = right_side.substr(index_of(right_side, '*') + 1);
-            assert(index_of(right_side, '-') == -1 && index_of(right_side, '+') == -1 && index_of(right_side, '/') == -1);
-            return true;
+            if (index_of(right_side, '+') != -1 || index_of(right_side, '-') != -1 || index_of(right_side, '/') != -1) return false;
         } else if (index_of(right_side, '/') != -1) {
             first = right_side.substr(0, index_of(right_side, '/'));
             second = right_side.substr(index_of(right_side, '/') + 1);
-            assert(index_of(right_side, '-') == -1 && index_of(right_side, '+') == -1 && index_of(right_side, '*') == -1);
-            return true;
+            if (index_of(right_side, '+') != -1 || index_of(right_side, '-') != -1 || index_of(right_side, '*') != -1) return false;
         }
+        return (is_number(first) || is_special_register(first)) && (is_number(second) || is_special_register(second));;
     }
     return false;
 }
@@ -413,7 +383,7 @@ bool is_ALU_operation(string command) {
 void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command) {
     string left_side = command.substr(0, index_of(command, '='));
     string right_side = command.substr(index_of(command, '=') + 1);
-    int value;
+    int value = count_operation(right_side, registers, stack, SP, RV);
     string type = "int";
     if (right_side[0] == '.') {
         if(right_side[1] == '1') type = "char";
@@ -421,73 +391,6 @@ void perform_ALU(int* registers, char* stack, int& SP, int& RV, string command) 
         right_side = right_side.substr(2);
     }
     
-    string first, second;
-    int first_value, second_value;
-    if (index_of(right_side, '+') != -1) {
-        first = right_side.substr(0, index_of(right_side, '+'));
-        if (is_special_register(first)) {
-            first_value = get_value_of_special_register(first, registers, SP, RV);
-        } else {
-            first_value = to_int(first);
-        }
-
-        second = right_side.substr(index_of(right_side, '+') + 1);
-        if (is_special_register(second)) {
-            second_value = get_value_of_special_register(second, registers, SP, RV);
-        } else {
-            second_value = to_int(second);
-        }
-
-        value = first_value + second_value;
-    } else if (index_of(right_side, '-') != -1) {
-        first = right_side.substr(0, index_of(right_side, '-'));
-        if (is_special_register(first)) {
-            first_value = get_value_of_special_register(first, registers, SP, RV);
-        } else {
-            first_value = to_int(first);
-        }
-
-        second = right_side.substr(index_of(right_side, '-') + 1);
-        if (is_special_register(second)) {
-            second_value = get_value_of_special_register(second, registers, SP, RV);
-        } else {
-            second_value = to_int(second);
-        }
-
-        value = first_value - second_value;
-    } else if (index_of(right_side, '*') != -1) {
-        first = right_side.substr(0, index_of(right_side, '*'));
-        if (is_special_register(first)) {
-            first_value = get_value_of_special_register(first, registers, SP, RV);
-        } else {
-            first_value = to_int(first);
-        }
-
-        second = right_side.substr(index_of(right_side, '*') + 1);
-        if (is_special_register(second)) {
-            second_value = get_value_of_special_register(second, registers, SP, RV);
-        } else {
-            second_value = to_int(second);
-        }
-
-        value = first_value * second_value;
-    } else if (index_of(right_side, '/') != -1) {
-        first = right_side.substr(0, index_of(right_side, '/'));
-        if (is_special_register(first)) {
-            first_value = get_value_of_special_register(first, registers, SP, RV);
-        } else {
-            first_value = to_int(first);
-        }
-
-        second = right_side.substr(index_of(right_side, '/') + 1);
-        if (is_special_register(second)) {
-            second_value = get_value_of_special_register(second, registers, SP, RV);
-        } else {
-            second_value = to_int(second);
-        }
-
-        value = first_value / second_value;
-    }
     update_register(left_side, value, registers, SP, RV, type);
 }
 
@@ -546,4 +449,76 @@ bool is_jump_operation(string command) {
     if (command.substr(0, 3) == "JMP") return true;
 
     return false;
+}
+
+int count_operation(string operation, int* registers, char* stack, int SP, int RV) {
+    int value;
+    string first, second;
+    int first_value, second_value;
+    if (index_of(operation, '+') != -1) {
+        first = operation.substr(0, index_of(operation, '+'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = operation.substr(index_of(operation, '+') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value + second_value;
+    } else if (index_of(operation, '-') != -1) {
+        first = operation.substr(0, index_of(operation, '-'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = operation.substr(index_of(operation, '-') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value - second_value;
+    } else if (index_of(operation, '*') != -1) {
+        first = operation.substr(0, index_of(operation, '*'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = operation.substr(index_of(operation, '*') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value * second_value;
+    } else if (index_of(operation, '/') != -1) {
+        first = operation.substr(0, index_of(operation, '/'));
+        if (is_special_register(first)) {
+            first_value = get_value_of_special_register(first, registers, SP, RV);
+        } else {
+            first_value = to_int(first);
+        }
+
+        second = operation.substr(index_of(operation, '/') + 1);
+        if (is_special_register(second)) {
+            second_value = get_value_of_special_register(second, registers, SP, RV);
+        } else {
+            second_value = to_int(second);
+        }
+
+        value = first_value / second_value;
+    }
+    return value;
 }
