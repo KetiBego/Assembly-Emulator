@@ -49,7 +49,8 @@ int main() {
         }
         my_file.close();
     } else {
-        cout << "Unable to open file";
+        cout << "Unable to open file\n";
+        return 0;
     }
 
     string current_command;
