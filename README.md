@@ -2,9 +2,9 @@
 This is Assembly emulator. It reads assembly code and executes it in c++.
 This program knows how to do store, load, and ALU operations, as well as understand how to do branching, JUMP operations, and call and execute functions.
 This package comes with 3 tests for assembly code:
-* The first sample (`Assembly_Sample.txt`) tests basic functions as addition, subtraction, multiplication and division.
-* The second sample (`Assembly_Sample_2.txt`) tests recursion by printing 10th number in fibonacci sequence.
-* The third sample (`Assembly_Sample_3.txt`) tests casting by doing operations on a char type variable.
+* The first sample [`Assembly_Sample.txt`](https://github.com/KetiBego/Assembly-Emulator/blob/main/Assembly_Sample.txt) tests basic functions as addition, subtraction, multiplication and division.
+* The second sample [`Assembly_Sample_2.txt`](https://github.com/KetiBego/Assembly-Emulator/blob/main/Assembly_Sample_2.txt) tests recursion by printing 10th number in fibonacci sequence.
+* The third sample [`Assembly_Sample_3.txt`](https://github.com/KetiBego/Assembly-Emulator/blob/main/Assembly_Sample_3.txt) tests casting by doing operations on a char type variable.
 You can see additional information in the test files itself (each one of them includes c++ version of the code in the comments, as well as necessary information about the code).
 Main code always prints return value in the end of the code. 
 ## Syntax to Use
